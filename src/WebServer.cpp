@@ -670,15 +670,13 @@ void WebServer::stop() {
 
 
 void WebServer::handlePower() {
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<256> doc;
     
     if (powerMonitor.isInitialized()) {
-        for (int i = 0; i < 3; i++) {
-            JsonObject channel = doc.createNestedObject("channel" + String(i + 1));
-            channel["current"] = powerMonitor.getCurrent_mA();
-            channel["voltage"] = powerMonitor.getBusVoltage_V();
-            channel["power"] = powerMonitor.getPower_mW() / 1000.0;  // 转换为瓦特
-        }
+        JsonObject channel = doc.createNestedObject("channel1");
+        channel["current"] = powerMonitor.getCurrent_mA();
+        channel["voltage"] = powerMonitor.getBusVoltage_V();
+        channel["power"] = powerMonitor.getPower_mW() / 1000.0;
     }
     
     String response;

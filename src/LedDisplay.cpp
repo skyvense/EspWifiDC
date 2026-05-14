@@ -1,7 +1,5 @@
 #include "LedDisplay.h"
 
-// ---- 底层 ---------------------------------------------------------------
-
 uint8_t LedDisplay::_seg(uint8_t n) {
     const uint8_t tbl[] = {
         SEG_0, SEG_1, SEG_2, SEG_3, SEG_4,
@@ -13,12 +11,14 @@ uint8_t LedDisplay::_seg(uint8_t n) {
 void LedDisplay::_writeCmd(uint8_t addr7, uint8_t data) {
     Wire.beginTransmission(addr7);
     Wire.write(data);
-    Wire.endTransmission();
+    uint8_t err = Wire.endTransmission();
+    if (err != 0) {
+        _i2cErrCnt++;
+    } else {
+        _i2cErrCnt = 0;
+    }
 }
 
-// 向4位数码管写入段码（dig0=最高位/左）
-// 注意：此函数内部不会强制设置小数点。
-// 小数点只在调用方按需传入带 SEG_DP 的段码。
 void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
     _writeCmd(CH455_DIG0_ADDR, d0);
     _writeCmd(CH455_DIG1_ADDR, d1);
@@ -26,16 +26,20 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
     _writeCmd(CH455_DIG3_ADDR, d3);
 }
 
-// ---- 公共接口 ------------------------------------------------------------
+void LedDisplay::_reinit() {
+    Wire.begin();
+    uint8_t sysParam = CH455_BIT_KOFF
+                     | ((_brightness & 0x07) << 4)
+                     | CH455_BIT_ENA;
+    Wire.beginTransmission(CH455_SYS_ADDR);
+    Wire.write(sysParam);
+    Wire.endTransmission();
+    _i2cErrCnt = 0;
+    Serial.println("CH455G re-initialized after I2C error");
+}
 
 void LedDisplay::begin(uint8_t brightness) {
-    // CH455G 系统参数字节格式:
-    //   bit 7:   KOFF  (1=仅显示驱动)
-    //   bit 6:4: INTENS(亮度, 000=1/8 ~ 111=8/8)
-    //   bit 3:   7SEG  (0=8段模式支持小数点)
-    //   bit 2:   SLEEP (0=正常)
-    //   bit 1:   保留(0)
-    //   bit 0:   ENA   (1=开启显示)
+    _brightness = brightness;
     uint8_t sysParam = CH455_BIT_KOFF
                      | ((brightness & 0x07) << 4)
                      | CH455_BIT_ENA;
@@ -47,7 +51,6 @@ void LedDisplay::begin(uint8_t brightness) {
     Serial.printf("CH455G init, sysParam=0x%02X\n", sysParam);
 }
 
-
 void LedDisplay::setIP(IPAddress ip) {
     _ip    = ip;
     _ipSet = true;
@@ -57,15 +60,11 @@ void LedDisplay::clear() {
     _showDigits(SEG_OFF, SEG_OFF, SEG_OFF, SEG_OFF);
 }
 
-// ---- 显示子函数 ----------------------------------------------------------
-
 void LedDisplay::_showIPLabel() {
-    // 显示 "IP  "
     _showDigits(SEG_I, SEG_P, SEG_OFF, SEG_OFF);
 }
 
 void LedDisplay::_showIPOctet(uint8_t val) {
-    // 最多3位整数，左对齐空格填充 → " XXX"
     uint8_t d0 = SEG_OFF;
     uint8_t d1 = SEG_OFF;
     uint8_t d2 = SEG_OFF;
@@ -77,7 +76,6 @@ void LedDisplay::_showIPOctet(uint8_t val) {
     _showDigits(d0, d1, d2, d3);
 }
 
-// 电压：格式 "XX.X"  例：12.5V → "12.5"
 void LedDisplay::_showVoltage(float v) {
     if (v < 0) v = 0;
     if (v > 99.9f) v = 99.9f;
@@ -95,8 +93,6 @@ void LedDisplay::_showVoltage(float v) {
     _showDigits(d0, d1, d2, d3);
 }
 
-// 电流：显示 mA 整数，0~9999
-// 例：1234mA → "1234", 500mA → " 500"
 void LedDisplay::_showCurrent(float mA) {
     if (mA < 0) mA = 0;
     uint16_t val = (uint16_t)(mA + 0.5f);
@@ -115,35 +111,24 @@ void LedDisplay::_showCurrent(float mA) {
     _showDigits(d0, d1, d2, d3);
 }
 
-// ---- 状态机 update ------------------------------------------------------
-
 void LedDisplay::update(float voltage_V, float current_mA) {
+    if (_i2cErrCnt >= 3) {
+        _reinit();
+    }
+
     unsigned long now     = millis();
     unsigned long elapsed = now - _startMs;
 
     if (elapsed < IP_DISPLAY_MS) {
-        // ---- IP 显示阶段（10秒） ----
-        // 分5个子阶段，每2秒一个
         uint8_t sub = (uint8_t)(elapsed / 2000);
         switch (sub) {
-            case 0:
-                _showIPLabel();
-                break;
-            case 1:
-                _showIPOctet(_ipSet ? _ip[0] : 0);
-                break;
-            case 2:
-                _showIPOctet(_ipSet ? _ip[1] : 0);
-                break;
-            case 3:
-                _showIPOctet(_ipSet ? _ip[2] : 0);
-                break;
-            default:
-                _showIPOctet(_ipSet ? _ip[3] : 0);
-                break;
+            case 0: _showIPLabel(); break;
+            case 1: _showIPOctet(_ipSet ? _ip[0] : 0); break;
+            case 2: _showIPOctet(_ipSet ? _ip[1] : 0); break;
+            case 3: _showIPOctet(_ipSet ? _ip[2] : 0); break;
+            default: _showIPOctet(_ipSet ? _ip[3] : 0); break;
         }
     } else {
-        // ---- 数据显示阶段（电压/电流轮换） ----
         if (now - _switchMs >= DATA_CYCLE_MS) {
             _switchMs  = now;
             _dataPhase = (_dataPhase + 1) % 2;

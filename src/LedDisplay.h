@@ -64,30 +64,27 @@ public:
     void begin(uint8_t brightness = 6);
     void setIP(IPAddress ip);
 
-    // 在 loop() 中每次调用，驱动内部状态机刷新数码管
     void update(float voltage_V, float current_mA);
 
     void clear();
 
 private:
-    unsigned long _startMs  = 0;
-    unsigned long _switchMs = 0;
-    uint8_t       _dataPhase = 0;   // 0=显示电压, 1=显示电流
+    unsigned long _startMs    = 0;
+    unsigned long _switchMs   = 0;
+    uint8_t       _dataPhase  = 0;
+    uint8_t       _brightness = 6;
+    uint8_t       _i2cErrCnt  = 0;
     IPAddress     _ip;
-    bool          _ipSet    = false;
+    bool          _ipSet      = false;
 
-    // 底层写命令
     void _writeCmd(uint8_t addr7, uint8_t data);
-
-    // 向4位数码管写入段码（dig0=最高位/左）
     void _showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
+    void _reinit();
 
-    // 显示相关
     void _showIPLabel();
     void _showIPOctet(uint8_t val);
     void _showVoltage(float v);
     void _showCurrent(float mA);
 
-    // 将数字0~9转为段码，超出范围返回 SEG_DASH
     static uint8_t _seg(uint8_t n);
 };

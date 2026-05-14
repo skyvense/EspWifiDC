@@ -5,7 +5,7 @@
 
 class PowerMonitor {
 public:
-    PowerMonitor() : ina219() {
+    PowerMonitor() : ina219(), _initialized(false) {
         for (int i = 0; i < 10; ++i) {
             currentBuffer[i] = 0;
             powerBuffer[i] = 0;
@@ -23,20 +23,15 @@ public:
             return false;
         }
         
-        // 配置INA219使用0.01Ω分流电阻
-        // 使用自定义校准
-        // 最大电流 = 3.2A
-        // 最大电压 = 32V
-        // 分流电阻 = 0.01Ω
         ina219.setCalibration_32V_2A();
         
-        // 打印配置信息
         Serial.println("INA219 initialized successfully");
         Serial.println("Configuration:");
         Serial.println("- Shunt Resistor: 0.01 ohm");
         Serial.println("- Max Current: 3.2A");
         Serial.println("- Max Voltage: 32V");
         
+        _initialized = true;
         return true;
     }
     
@@ -47,17 +42,14 @@ public:
     float getCurrent_mA() {
         float rawCurrent = ina219.getCurrent_mA();
         if (rawCurrent < 0) {
-            // 负数不入队，直接返回当前平均
             if (bufferCount == 0) return 0;
             float sum = 0;
             for (int i = 0; i < bufferCount; i++) sum += currentBuffer[i];
             return sum / bufferCount;
         }
-        // 入队
         currentBuffer[bufferIndex] = rawCurrent;
         bufferIndex = (bufferIndex + 1) % 10;
         if (bufferCount < 10) bufferCount++;
-        // 计算平均
         float sum = 0;
         for (int i = 0; i < bufferCount; i++) sum += currentBuffer[i];
         return sum / bufferCount;
@@ -80,11 +72,12 @@ public:
     }
     
     bool isInitialized() {
-        return ina219.begin();
+        return _initialized;
     }
 
 private:
     Adafruit_INA219 ina219;
+    bool _initialized;
     float currentBuffer[10];
     int bufferIndex;
     int bufferCount;
