@@ -15,7 +15,7 @@
 
 // ---- 引脚定义 ------------------------------------------------------------
 #define STATUS_LED      D4      // EasyLed 状态灯（低电平有效）
-#define OUTPUT_EN_PIN   16      // GPIO16 / D4，LOW=输出使能，HIGH=禁用
+#define OUTPUT_EN_PIN   16      // GPIO16, HIGH=output enabled, LOW=disabled
 #define RGB_LED_PIN     13      // GPIO13，NeoPixel
 #define NUM_LEDS        1
 #define BRIGHTNESS      50
@@ -36,7 +36,7 @@ bool outputEnabled = false;
 
 void setOutputEnable(bool en) {
     outputEnabled = en;
-    digitalWrite(OUTPUT_EN_PIN, en ? LOW : HIGH);   // LOW = 使能
+    digitalWrite(OUTPUT_EN_PIN, en ? HIGH : LOW);
     Serial.printf("Output %s\n", en ? "ENABLED" : "DISABLED");
 }
 
@@ -164,7 +164,7 @@ void setup() {
 
     // 输出使能引脚（默认禁用）
     pinMode(OUTPUT_EN_PIN, OUTPUT);
-    digitalWrite(OUTPUT_EN_PIN, HIGH);  // HIGH = 禁用
+    digitalWrite(OUTPUT_EN_PIN, LOW);
 
     // NeoPixel 初始化
     pixels.begin();
