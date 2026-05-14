@@ -238,27 +238,25 @@ void loop() {
     checkButton();
     wifi.WiFiWatchDog();
     webServer.handleClient();
+    yield();
+
     display.update();
 
-    // 每 100 次循环更新一次数码管和彩灯（约每 100ms）
-    if (loop_count % 100 == 0) {
+    if (loop_count % 200 == 0) {
         float current = powerMonitor.getCurrent_mA();
         float voltage = powerMonitor.getBusVoltage_V();
 
-        // 数码管更新
         ledDisplay.update(voltage, current);
 
-        // RGB 彩灯：有输出电压则点亮绿色，否则熄灭
         if (voltage > 1.0f) {
             pixels.setBrightness(50);
-            pixels.setPixelColor(0, pixels.Color(0, 200, 0));  // 绿色
+            pixels.setPixelColor(0, pixels.Color(0, 200, 0));
         } else {
-            pixels.setPixelColor(0, pixels.Color(0, 0, 0));    // 熄灭
+            pixels.setPixelColor(0, pixels.Color(0, 0, 0));
         }
         pixels.show();
     }
 
-    // MQTT 及重连逻辑
     if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
         mqtt.loop();
         loop_count++;
@@ -271,7 +269,6 @@ void loop() {
             loop_count++;
             if (loop_count % 2000 == 0) {
                 led.flash(1, 10, 50, 0, 0);
-                delay(10);
             }
         } else {
             if (!mqtt.connected()) {

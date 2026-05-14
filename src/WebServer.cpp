@@ -685,18 +685,7 @@ void WebServer::handlePower() {
 }
 
 void WebServer::handleRoot() {
-    Serial.println("Handling root request");
-    
-    // 检查 INDEX_HTML 是否有效
-    if (strlen(INDEX_HTML) == 0) {
-        Serial.println("ERROR: INDEX_HTML is empty!");
-        server.send(500, "text/plain", "Internal Server Error");
-        return;
-    }
-    
-    // 发送 HTML 内容
-    server.send(200, "text/html", INDEX_HTML);  // 直接使用 INDEX_HTML，不使用 FPSTR
-    Serial.println("HTML content sent successfully");
+    server.send_P(200, "text/html", INDEX_HTML);
 }
 
 void WebServer::handleStatus() {
@@ -986,8 +975,6 @@ void WebServer::handleUpdateUpload() {
 }
 
 void WebServer::handleNotFound() {
-    Serial.print("404 Not Found: ");
-    Serial.println(server.uri());
     server.send(404, "text/plain", "Not found");
 }
 
