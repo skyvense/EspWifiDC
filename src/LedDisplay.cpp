@@ -16,6 +16,9 @@ void LedDisplay::_writeCmd(uint8_t addr7, uint8_t data) {
     Wire.endTransmission();
 }
 
+// 向4位数码管写入段码（dig0=最高位/左）
+// 注意：此函数内部不会强制设置小数点。
+// 小数点只在调用方按需传入带 SEG_DP 的段码。
 void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
     _writeCmd(CH455_DIG0_ADDR, d0);
     _writeCmd(CH455_DIG1_ADDR, d1);
@@ -26,8 +29,8 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
 // ---- 公共接口 ------------------------------------------------------------
 
 void LedDisplay::begin(uint8_t brightness) {
-    // 系统参数: bit[6:4]=BRT, bit3=RON=1, bit[2:0]=0(DP全灭)
-    uint8_t sysParam = CH455_DISP_ON | ((brightness & 0x07) << 4);
+    // 系统参数: bit[3:1]=BRT, bit0=RON=1
+    uint8_t sysParam = CH455_DISP_ON | ((brightness & 0x07) << 1);
     _writeCmd(CH455_SYS_ADDR, sysParam);
     _startMs  = millis();
     _switchMs = millis();
@@ -65,22 +68,21 @@ void LedDisplay::_showIPOctet(uint8_t val) {
     _showDigits(d0, d1, d2, d3);
 }
 
-// 电压：格式 "XX.XX"（最高2位整数 + 小数点 + 2位小数）
-// 例：5.12V → " 5.12", 12.5V → "12.50"
+// 电压：格式 " XX.X"  例：12.5V → "12.5"
+// 为避免 DP 引脚不确定性，暂时改为显示整数*10："125 " (dig0=1,dig1=2,dig2=5,dig3=空)
 void LedDisplay::_showVoltage(float v) {
     if (v < 0) v = 0;
-    if (v > 99.99f) v = 99.99f;
+    if (v > 99.9f) v = 99.9f;
 
-    uint16_t val = (uint16_t)(v * 100 + 0.5f);  // 单位：0.01V
-    uint8_t tens  = val / 1000;
-    uint8_t ones  = (val / 100) % 10;
-    uint8_t dec1  = (val / 10)  % 10;
-    uint8_t dec2  = val % 10;
+    uint16_t val = (uint16_t)(v * 10 + 0.5f);  // 单位：0.1V
+    uint8_t tens = val / 100;
+    uint8_t ones = (val / 10) % 10;
+    uint8_t dec  = val % 10;
 
     uint8_t d0 = (tens > 0) ? _seg(tens) : SEG_OFF;
-    uint8_t d1 = _seg(ones) | SEG_DP;   // 小数点在个位后
-    uint8_t d2 = _seg(dec1);
-    uint8_t d3 = _seg(dec2);
+    uint8_t d1 = _seg(ones);
+    uint8_t d2 = SEG_DASH;  // 用横杆代替小数点
+    uint8_t d3 = _seg(dec);
 
     _showDigits(d0, d1, d2, d3);
 }
