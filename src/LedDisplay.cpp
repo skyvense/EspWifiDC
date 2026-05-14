@@ -29,15 +29,19 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
 // ---- 公共接口 ------------------------------------------------------------
 
 void LedDisplay::begin(uint8_t brightness) {
-    // 系统参数: bit[3:1]=BRT, bit0=RON=1
-    uint8_t sysParam = CH455_DISP_ON | ((brightness & 0x07) << 1);
+    // CH455G 系统参数字节格式: bit[3:1]=BRT, bit0=RON
+    // 原始 0x0D=0b00001101 可用，但 bit2=1 会独立点亮各位小数点
+    // 修复：清除 bit2，其余保持不变 → 0x0D & ~0x04 = 0x09
+    // 0x09 = 0b00001001: BRT=100=4(亮度稍低), RON=1, bit2=0(DP灭)
+    uint8_t sysParam = (CH455_DISP_ON | ((brightness & 0x07) << 1)) & ~0x04;
     _writeCmd(CH455_SYS_ADDR, sysParam);
     _startMs  = millis();
     _switchMs = millis();
     _dataPhase = 0;
     clear();
-    Serial.println("CH455G LedDisplay initialized");
+    Serial.printf("CH455G init, sysParam=0x%02X\n", sysParam);
 }
+
 
 void LedDisplay::setIP(IPAddress ip) {
     _ip    = ip;
