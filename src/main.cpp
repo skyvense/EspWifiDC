@@ -34,9 +34,33 @@ PubSubClient   mqtt(wifi.client);
 // ---- 输出使能状态（WebServer 通过 extern 访问） --------------------------
 bool outputEnabled = false;
 
+void loadOutputState() {
+    File f = SPIFFS.open("/output.json", "r");
+    if (f) {
+        StaticJsonDocument<64> doc;
+        if (!deserializeJson(doc, f)) {
+            outputEnabled = doc["enabled"] | false;
+        }
+        f.close();
+    }
+    digitalWrite(OUTPUT_EN_PIN, outputEnabled ? HIGH : LOW);
+    Serial.printf("Output state loaded: %s\n", outputEnabled ? "ON" : "OFF");
+}
+
+void saveOutputState() {
+    StaticJsonDocument<64> doc;
+    doc["enabled"] = outputEnabled;
+    File f = SPIFFS.open("/output.json", "w");
+    if (f) {
+        serializeJson(doc, f);
+        f.close();
+    }
+}
+
 void setOutputEnable(bool en) {
     outputEnabled = en;
     digitalWrite(OUTPUT_EN_PIN, en ? HIGH : LOW);
+    saveOutputState();
     Serial.printf("Output %s\n", en ? "ENABLED" : "DISABLED");
 }
 
@@ -185,6 +209,8 @@ void setup() {
     wifi.initFS();
     wifi.ConnectWifi();
     wifi.DisplayIP();
+
+    loadOutputState();
 
     // CH455G 数码管
     ledDisplay.begin(6);

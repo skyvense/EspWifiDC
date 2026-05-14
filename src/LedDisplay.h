@@ -56,8 +56,9 @@
 #define SEG_n   0x54    // n
 
 // 时序常量
-#define IP_DISPLAY_MS   10000   // 启动后显示IP的总时长 (ms)
-#define DATA_CYCLE_MS   2000    // 电压/电流轮换间隔 (ms)
+#define IP_DISPLAY_MS   10000
+#define DATA_CYCLE_MS   2000
+#define REINIT_INTERVAL_MS 30000
 
 class LedDisplay {
 public:
@@ -71,6 +72,7 @@ public:
 private:
     unsigned long _startMs    = 0;
     unsigned long _switchMs   = 0;
+    unsigned long _lastReinit = 0;
     uint8_t       _dataPhase  = 0;
     uint8_t       _brightness = 6;
     uint8_t       _i2cErrCnt  = 0;

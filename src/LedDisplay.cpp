@@ -44,9 +44,10 @@ void LedDisplay::begin(uint8_t brightness) {
                      | ((brightness & 0x07) << 4)
                      | CH455_BIT_ENA;
     _writeCmd(CH455_SYS_ADDR, sysParam);
-    _startMs  = millis();
-    _switchMs = millis();
-    _dataPhase = 0;
+    _startMs    = millis();
+    _switchMs   = millis();
+    _lastReinit = millis();
+    _dataPhase  = 0;
     clear();
     Serial.printf("CH455G init, sysParam=0x%02X\n", sysParam);
 }
@@ -112,11 +113,13 @@ void LedDisplay::_showCurrent(float mA) {
 }
 
 void LedDisplay::update(float voltage_V, float current_mA) {
-    if (_i2cErrCnt >= 3) {
+    unsigned long now = millis();
+
+    if (_i2cErrCnt >= 3 || now - _lastReinit >= REINIT_INTERVAL_MS) {
         _reinit();
+        _lastReinit = now;
     }
 
-    unsigned long now     = millis();
     unsigned long elapsed = now - _startMs;
 
     if (elapsed < IP_DISPLAY_MS) {
