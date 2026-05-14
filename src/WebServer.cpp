@@ -10,7 +10,7 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP8266 PD Power Supply</title>
+    <title>ESP8266 Power Supply</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -75,65 +75,6 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             font-size: 16px;
         }
 
-        .relay-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .relay-card {
-            background: var(--card-background);
-            border-radius: var(--border-radius);
-            padding: 20px;
-            box-shadow: var(--shadow);
-            transition: transform 0.3s ease;
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .relay-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .relay-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .relay-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-        }
-
-        .relay-icon i {
-            color: white;
-            font-size: 20px;
-        }
-
-        .relay-title {
-            font-size: 18px;
-            font-weight: 500;
-            color: var(--text-color);
-        }
-
-        .relay-status {
-            font-size: 14px;
-            color: var(--text-light);
-            margin-top: 5px;
-        }
-
         .switch {
             position: relative;
             display: inline-block;
@@ -188,27 +129,9 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             animation: fadeIn 0.5s ease-out;
         }
 
-        .power-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 15px;
-        }
-
-        .power-item {
-            text-align: center;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: var(--border-radius);
-            transition: transform 0.2s;
-        }
-
-        .power-item.monitor {
-            cursor: pointer;
-        }
-
-        .power-item.monitor:hover {
-            transform: scale(1.02);
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .power-value {
@@ -222,80 +145,6 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             font-size: 14px;
             color: var(--text-light);
             margin: 5px 0;
-        }
-
-        .voltage-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 15px 0;
-            justify-content: center;
-        }
-
-        .voltage-option {
-            position: relative;
-            width: 80px;
-            height: 80px;
-            margin: 5px;
-        }
-
-        .voltage-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .voltage-option span {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: var(--border-radius);
-            font-size: 20px;
-            font-weight: 500;
-            color: var(--text-color);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .voltage-option input[type="radio"]:checked + span {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
-        }
-
-        .voltage-option:hover span {
-            border-color: var(--primary-color);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .voltage-option input[type="radio"]:checked + span:hover {
-            transform: scale(1.05);
-        }
-
-        .voltage-display {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .voltage-display .power-value {
-            font-size: 48px;
-            margin: 10px 0;
-        }
-
-        .voltage-display .power-label {
-            font-size: 16px;
-            color: var(--text-light);
         }
 
         .power-metrics {
@@ -399,16 +248,11 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
                 font-size: 24px;
             }
 
-            .relay-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .power-grid {
+            .power-metrics {
                 grid-template-columns: 1fr;
             }
         }
 
-        /* 添加模态框样式 */
         .modal {
             display: none;
             position: fixed;
@@ -462,155 +306,13 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             outline: none;
             border-color: var(--primary-color);
         }
-
-        .timer-control {
-            margin-top: 10px;
-        }
-        
-        .timer-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .timer-btn:hover {
-            background: var(--primary-dark);
-        }
-        
-        .timer-config {
-            margin-top: 20px;
-        }
-        
-        .timer-section {
-            margin-bottom: 20px;
-        }
-        
-        .timer-inputs {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .timer-inputs input[type="time"] {
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .timer-list {
-            margin-bottom: 20px;
-        }
-        
-        .timer-item {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .timer-item:hover {
-            background: #e9ecef;
-        }
-        
-        .timer-info {
-            flex-grow: 1;
-        }
-        
-        .timer-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .timer-btn.delete {
-            background: #dc3545;
-        }
-        
-        .timer-btn.delete:hover {
-            background: #c82333;
-        }
-        
-        .input-group {
-            margin: 10px 0;
-        }
-        
-        .input-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .input-group input,
-        .input-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .weekday-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 5px;
-        }
-        
-        .weekday-buttons label {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .protection-config {
-            margin-top: 20px;
-        }
-        
-        .protection-section {
-            margin-bottom: 20px;
-        }
-        
-        .protection-inputs {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin: 15px 0;
-        }
-        
-        .protection-item {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .protection-label {
-            font-weight: 500;
-        }
-        
-        .protection-value {
-            color: var(--text-light);
-        }
-        
-        .warning {
-            color: var(--error-color);
-            margin-left: 10px;
-        }
     </style>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>ESP8266 PD Power Supply</h1>
+            <h1>ESP8266 Power Supply</h1>
             <div class="status">Status: Connected</div>
         </div>
 
@@ -638,14 +340,14 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
-        <div class="power-info relay-control">
-            <h2>输出控制 / Output Control</h2>
+        <div class="power-info output-control">
+            <h2>Output Control</h2>
             <div style="text-align:center; padding:20px;">
                 <label class="switch">
                     <input type="checkbox" id="outputEnable" onchange="setOutputEnable(this.checked)">
                     <span class="slider"></span>
                 </label>
-                <div class="power-label" style="margin-top:12px; font-size:16px;" id="outputStatus">输出：关闭</div>
+                <div class="power-label" style="margin-top:12px; font-size:16px;" id="outputStatus">Output: OFF</div>
             </div>
         </div>
 
@@ -661,7 +363,6 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
         </div>
     </div>
 
-    <!-- 添加模态框 -->
     <div id="powerChartModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -842,7 +543,7 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 
         function updateOutputStatus(enabled) {
             document.getElementById('outputEnable').checked = enabled;
-            document.getElementById('outputStatus').textContent = enabled ? '输出：开启 ✓' : '输出：关闭';
+            document.getElementById('outputStatus').textContent = enabled ? 'Output: ON' : 'Output: OFF';
             document.getElementById('outputStatus').style.color = enabled ? '#4CAF50' : '#666';
         }
 
