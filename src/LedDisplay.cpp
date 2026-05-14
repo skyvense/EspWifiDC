@@ -26,8 +26,8 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
 // ---- 公共接口 ------------------------------------------------------------
 
 void LedDisplay::begin(uint8_t brightness) {
-    // 系统参数: bit0=显示ON, bits[3:1]=亮度
-    uint8_t sysParam = CH455_DISP_ON | ((brightness & 0x07) << 1);
+    // 系统参数: bit[6:4]=BRT, bit3=RON=1, bit[2:0]=0(DP全灭)
+    uint8_t sysParam = CH455_DISP_ON | ((brightness & 0x07) << 4);
     _writeCmd(CH455_SYS_ADDR, sysParam);
     _startMs  = millis();
     _switchMs = millis();

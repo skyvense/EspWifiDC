@@ -19,8 +19,11 @@
 #define CH455_DIG2_ADDR  0x36
 #define CH455_DIG3_ADDR  0x37
 
-// 系统参数字节: bit0=显示开关, bits[3:1]=亮度(0~7)
-#define CH455_DISP_ON    0x01
+// 系统参数字节格式（CH455G）:
+//   bit[6:4] = BRT 亮度 0~7
+//   bit3     = RON 显示开关（1=开）
+//   bit[2:0] = 各位小数点控制，必须保持 0 否则 DP 全亮
+#define CH455_DISP_ON    0x08   // 仅 RON=1，亮度=0，DP全灭
 #define CH455_DISP_OFF   0x00
 
 // 7段编码（共阴极，bit7=小数点）
