@@ -29,11 +29,16 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
 // ---- 公共接口 ------------------------------------------------------------
 
 void LedDisplay::begin(uint8_t brightness) {
-    // CH455G 系统参数字节格式: bit[3:1]=BRT, bit0=RON
-    // 原始 0x0D=0b00001101 可用，但 bit2=1 会独立点亮各位小数点
-    // 修复：清除 bit2，其余保持不变 → 0x0D & ~0x04 = 0x09
-    // 0x09 = 0b00001001: BRT=100=4(亮度稍低), RON=1, bit2=0(DP灭)
-    uint8_t sysParam = (CH455_DISP_ON | ((brightness & 0x07) << 1)) & ~0x04;
+    // CH455G 系统参数字节格式:
+    //   bit 7:   KOFF  (1=仅显示驱动)
+    //   bit 6:4: INTENS(亮度, 000=1/8 ~ 111=8/8)
+    //   bit 3:   7SEG  (0=8段模式支持小数点)
+    //   bit 2:   SLEEP (0=正常)
+    //   bit 1:   保留(0)
+    //   bit 0:   ENA   (1=开启显示)
+    uint8_t sysParam = CH455_BIT_KOFF
+                     | ((brightness & 0x07) << 4)
+                     | CH455_BIT_ENA;
     _writeCmd(CH455_SYS_ADDR, sysParam);
     _startMs  = millis();
     _switchMs = millis();
@@ -72,21 +77,20 @@ void LedDisplay::_showIPOctet(uint8_t val) {
     _showDigits(d0, d1, d2, d3);
 }
 
-// 电压：格式 " XX.X"  例：12.5V → "12.5"
-// 为避免 DP 引脚不确定性，暂时改为显示整数*10："125 " (dig0=1,dig1=2,dig2=5,dig3=空)
+// 电压：格式 "XX.X"  例：12.5V → "12.5"
 void LedDisplay::_showVoltage(float v) {
     if (v < 0) v = 0;
     if (v > 99.9f) v = 99.9f;
 
-    uint16_t val = (uint16_t)(v * 10 + 0.5f);  // 单位：0.1V
+    uint16_t val = (uint16_t)(v * 10 + 0.5f);
     uint8_t tens = val / 100;
     uint8_t ones = (val / 10) % 10;
     uint8_t dec  = val % 10;
 
     uint8_t d0 = (tens > 0) ? _seg(tens) : SEG_OFF;
-    uint8_t d1 = _seg(ones);
-    uint8_t d2 = SEG_DASH;  // 用横杆代替小数点
-    uint8_t d3 = _seg(dec);
+    uint8_t d1 = _seg(ones) | SEG_DP;
+    uint8_t d2 = _seg(dec);
+    uint8_t d3 = SEG_OFF;
 
     _showDigits(d0, d1, d2, d3);
 }

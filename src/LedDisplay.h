@@ -19,12 +19,19 @@
 #define CH455_DIG2_ADDR  0x36
 #define CH455_DIG3_ADDR  0x37
 
-// CH455G 系统参数字节格式: bit[3:1]=BRT, bit0=RON
-// 原始 0x0D=0b00001101 可亮，但 bit2=1 独立点亮小数点
-// 修复：& ~0x04 清除 bit2 → 0x0D & ~0x04 = 0x09
-// 0x09 = 0b00001001: BRT=100=4, RON=1(bit0), bit2=0(DP灭)
-#define CH455_DISP_ON    0x01   // RON=1 at bit0
-#define CH455_DISP_OFF   0x00
+// CH455G 系统参数字节格式（数据手册）:
+//   bit 7:   KOFF  (1=仅显示驱动, 0=显示驱动+键盘扫描)
+//   bit 6:4: INTENS(亮度, 000=1/8最暗 ~ 111=8/8最亮)
+//   bit 3:   7SEG  (1=7段模式无小数点, 0=8段模式支持小数点)
+//   bit 2:   SLEEP (1=低功耗, 0=正常)
+//   bit 1:   保留(0)
+//   bit 0:   ENA   (1=开启显示)
+#define CH455_BIT_ENA     0x01
+#define CH455_BIT_SLEEP   0x04
+#define CH455_BIT_7SEG    0x08
+#define CH455_BIT_KOFF    0x80
+#define CH455_DISP_ON     CH455_BIT_ENA
+#define CH455_DISP_OFF    0x00
 
 // 7段编码（共阴极，bit7=小数点）
 #define SEG_0   0x3F
