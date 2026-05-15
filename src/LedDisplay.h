@@ -52,8 +52,9 @@
 #define SEG_I   0x06    // I
 #define SEG_P   0x73    // P
 #define SEG_A   0x77    // A
-#define SEG_V_  0x3E    // V（同U形状）
+#define SEG_V_  0x3E    // V
 #define SEG_n   0x54    // n
+#define SEG_m   0x54    // m (same as n on 7-seg)
 
 // 时序常量
 #define IP_DISPLAY_MS   10000
