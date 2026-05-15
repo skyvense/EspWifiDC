@@ -3,6 +3,10 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
+#define SHUNT_OHM 0.01f
+#define SHUNT_CALIBRATION_OHM 0.1f
+#define SHUNT_FACTOR (SHUNT_CALIBRATION_OHM / SHUNT_OHM)
+
 class PowerMonitor {
 public:
     PowerMonitor() : ina219(), _initialized(false) {
@@ -25,11 +29,7 @@ public:
         
         ina219.setCalibration_32V_2A();
         
-        Serial.println("INA219 initialized successfully");
-        Serial.println("Configuration:");
-        Serial.println("- Shunt Resistor: 0.01 ohm");
-        Serial.println("- Max Current: 3.2A");
-        Serial.println("- Max Voltage: 32V");
+        Serial.printf("INA219 init, shunt=%.3f ohm, factor=%.1fx\n", SHUNT_OHM, SHUNT_FACTOR);
         
         _initialized = true;
         return true;
@@ -40,7 +40,7 @@ public:
     }
     
     float getCurrent_mA() {
-        float rawCurrent = ina219.getCurrent_mA();
+        float rawCurrent = ina219.getCurrent_mA() * SHUNT_FACTOR;
         if (rawCurrent < 0) {
             if (bufferCount == 0) return 0;
             float sum = 0;
@@ -56,7 +56,7 @@ public:
     }
     
     float getPower_mW() {
-        float rawPower = ina219.getPower_mW();
+        float rawPower = ina219.getPower_mW() * SHUNT_FACTOR;
         if (rawPower < 0) {
             if (powerCount == 0) return 0;
             float sum = 0;
