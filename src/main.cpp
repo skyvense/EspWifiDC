@@ -196,18 +196,18 @@ void updateRGBLed(float current_mA) {
 
     float a = current_mA / 1000.0f;
     if (a < 0) a = 0;
-    if (a > 10.0f) a = 10.0f;
+    if (a > 3.0f) a = 3.0f;
 
-    float t = a / 10.0f;
-    uint8_t brightness = (uint8_t)(30 + t * 225);
+    float t = a / 3.0f;
+    uint8_t brightness = (uint8_t)(5 + pow(t, 0.4f) * 250);
     uint8_t r, g;
 
-    if (t < 0.5f) {
-        float s = t * 2.0f;
+    if (t < 0.33f) {
+        float s = t / 0.33f;
         r = (uint8_t)(s * 255);
         g = 255;
     } else {
-        float s = (t - 0.5f) * 2.0f;
+        float s = (t - 0.33f) / 0.67f;
         r = 255;
         g = (uint8_t)((1.0f - s) * 255);
     }
