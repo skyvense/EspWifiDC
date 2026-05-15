@@ -1,147 +1,96 @@
-# ESP8266 PD WiFi Power Supply
+# EspWifiDC
 
-A smart power supply system based on ESP8266 and INA219, featuring USB PD (Power Delivery) support, real-time power monitoring, and WiFi connectivity.
+WiFi-controlled DC power supply with real-time monitoring, based on ESP8266.
 
 ## Features
 
-- **USB PD Support**
-  - USB Power Delivery protocol support
-  - Multiple voltage/current profiles
-  - Dynamic power negotiation
+- **Output Enable Control** — Remote on/off switch via web UI, with state persistence across reboots
+- **Power Monitoring** — INA219 measures voltage, current, and power in real time (0.01Ω shunt, 10x calibrated)
+- **7-Segment Display** — CH455G drives a 4-digit display showing voltage (XX.XV) and current (X.XXA / XX.XA), alternating every 2 seconds
+- **OLED Display** — SSD1306 shows WiFi status and power info in rotation
+- **Web Interface** — Responsive dashboard with live power data, output toggle, and power chart
+- **WiFi Management** — Auto-connect with AP fallback; configure credentials via captive portal
+- **MQTT** — Publish power data to an MQTT broker
+- **OTA Upgrade** — Firmware update via web interface
+- **RGB LED** — Green indicator when output voltage is present
+- **Button Control** — Short press toggles output, long press (3s) clears config and reboots
 
-- **High-Precision Power Monitoring**
-  - Current measurement range: 0-2A with 0.1mA resolution
-  - Voltage measurement range: 0-32V
-  - Power measurement with 2mW resolution
-  - Calibrated for 0.1Ω shunt resistor
+## Hardware
 
-- **Real-time Web Interface**
-  - Live data visualization using Chart.js
-  - Responsive design for both desktop and mobile
-  - Auto-refreshing data every 2 seconds
-  - Historical data display with configurable time range
+| Component | Description |
+|-----------|-------------|
+| ESP8266 NodeMCU | Main controller |
+| INA219 | Voltage/current sensor (0.01Ω shunt) |
+| CH455G | I2C 7-segment LED driver (4 digits) |
+| SSD1306 | 128×32 I2C OLED |
+| NeoPixel | WS2812B RGB LED (×1) |
 
-- **Network Features**
-  - WiFi connectivity with automatic reconnection
-  - Access Point mode for direct connection
-  - Configurable WiFi credentials
-  - Network status monitoring
+### Pin Mapping
 
-## Hardware Requirements
+| Pin | GPIO | Function |
+|-----|------|----------|
+| D4 | 16 | Output enable (HIGH=on, LOW=off) |
+| D4 | 2 | Status LED (active low, EasyLed) |
+| D7 | 13 | NeoPixel data |
+| D3 | 0 | Button (internal pull-up) |
+| D1 | 5 | I2C SCL |
+| D2 | 4 | I2C SDA |
 
-- ESP8266 NodeMCU development board
-- INA219 current sensor
-- 0.1Ω shunt resistor
-- USB PD controller
-- Power supply (3.3V-5V)
-- USB cable for programming
+## Software
 
-## Software Requirements
+### Dependencies
 
-- PlatformIO IDE
-- ESP8266 Arduino Core
-- Required Libraries:
-  - Adafruit INA219
-  - ESPAsyncWebServer
-  - AsyncTCP
-  - ArduinoJson
-  - SPIFFS
+- PlatformIO (espressif8266 platform)
+- ArduinoJson
+- Adafruit INA219
+- Adafruit SSD1306 + GFX
+- Adafruit NeoPixel
+- EasyLed
+- PubSubClient
 
-## Installation
+### Build & Flash
 
-1. Clone this repository
-2. Open the project in PlatformIO
-3. Install required libraries
-4. Configure WiFi credentials in `config.h`
-5. Upload the code to ESP8266
-6. Upload the web interface files to SPIFFS
-
-## Configuration
-
-### WiFi Settings
-Edit `config.h` to set your WiFi credentials:
-```cpp
-#define WIFI_SSID "your_ssid"
-#define WIFI_PASSWORD "your_password"
+```bash
+pio run -t upload
+pio run -t uploadfs   # SPIFFS (config storage)
 ```
 
-### Measurement Settings
-- Current measurement is calibrated for 0.1Ω shunt resistor
-- Default sampling interval: 2 seconds
-- Default data retention: 24 hours
+### First Boot
 
-## Usage
+1. If no WiFi config is found, the device starts in AP mode (SSID: `ESP_Config_XXXXXXXX`)
+2. Connect to the AP and navigate to `http://192.168.4.1/config`
+3. Enter your WiFi credentials and MQTT server, then save
+4. The device reboots and connects to your WiFi
+5. The 7-segment display shows the IP address for 10 seconds, then alternates voltage/current
 
-1. Power on the ESP8266
-2. Connect to the ESP8266's WiFi network
-3. Open a web browser and navigate to `http://192.168.4.1`
-4. View real-time measurements and historical data
-5. Use the interface to:
-   - Monitor current, voltage, and power
-   - Configure PD profiles
-   - View network status
+## Web Interface
 
-## Data Format
+- `/` — Main dashboard: power monitoring, output toggle, power chart
+- `/config` — WiFi & MQTT configuration
+- `/upgrade` — OTA firmware upload
+- `/power` — JSON API: `{"channel1":{"current":...,"voltage":...,"power":...}}`
+- `/output` — JSON API: `GET` reads state, `GET ?enable=1|0` sets state
+- `/status` — JSON API: build date, WiFi info
 
-The system uses two data formats:
+## 7-Segment Display Format
 
-### Real-time Data (JSON)
-```json
-{
-    "channel1": {
-        "current": 1.599999905,  // Current in mA
-        "voltage": 11.56799984,  // Voltage in V
-        "power": 18.5087986      // Power in mW
-    }
-}
+| Phase | Display | Example |
+|-------|---------|---------|
+| Boot (10s) | IP address | `IP  ` → `192 ` → `168 ` → ... |
+| Voltage | XX.XV | `12.5V` |
+| Current < 10A | X.XXA | `1.50A` |
+| Current ≥ 10A | XX.XA | `12.5A` |
+
+Voltage and current alternate every 2 seconds.
+
+## Project Structure
+
 ```
-
-### Units
-- Current: milliamperes (mA)
-- Voltage: volts (V)
-- Power: milliwatts (mW)
-
-### Data Storage
-- Data is stored in JSON format
-- Timestamps are in Unix epoch format
-- Values are stored with 6 decimal places precision
-
-## Calibration
-
-The system is pre-calibrated for a 0.1Ω shunt resistor. If using a different shunt resistor, adjust the calibration values in the INA219 library:
-
-```cpp
-ina219_calValue = 4096;  // Calibration value for 0.1Ω shunt
-ina219_currentDivider_mA = 10;  // 1 bit = 0.1mA
-ina219_powerMultiplier_mW = 2;  // 1 bit = 2mW
+src/
+├── main.cpp           # Main loop, setup, button, MQTT
+├── PowerMonitor.h     # INA219 wrapper with 10x shunt correction
+├── LedDisplay.h/cpp   # CH455G 7-segment driver
+├── Display.h/cpp      # SSD1306 OLED display
+├── WebServer.h/cpp    # HTTP server + embedded HTML
+└── EspSmartWifi.h/cpp # WiFi config, AP/STA management
 ```
-
-## Troubleshooting
-
-1. **No WiFi Connection**
-   - Check WiFi credentials
-   - Ensure ESP8266 is in range
-   - Verify power supply
-
-2. **Inaccurate Measurements**
-   - Verify shunt resistor value
-   - Check calibration values
-   - Ensure proper connections
-
-3. **Web Interface Not Loading**
-   - Clear browser cache
-   - Check SPIFFS upload
-   - Verify network connection
-
-4. **PD Issues**
-   - Check USB cable quality
-   - Verify PD controller connections
-   - Ensure proper power supply
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
