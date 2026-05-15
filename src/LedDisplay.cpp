@@ -97,19 +97,22 @@ void LedDisplay::_showVoltage(float v) {
 void LedDisplay::_showCurrent(float mA) {
     if (mA < 0) mA = 0;
     float a = mA / 1000.0f;
-    if (a > 9.99f) a = 9.99f;
 
-    uint16_t val = (uint16_t)(a * 100 + 0.5f);
-    uint8_t ones       = val / 100;
-    uint8_t tenths     = (val / 10) % 10;
-    uint8_t hundredths = val % 10;
-
-    uint8_t d0 = _seg(ones) | SEG_DP;
-    uint8_t d1 = _seg(tenths);
-    uint8_t d2 = _seg(hundredths);
-    uint8_t d3 = SEG_A;
-
-    _showDigits(d0, d1, d2, d3);
+    if (a < 10.0f) {
+        uint16_t val = (uint16_t)(a * 100 + 0.5f);
+        uint8_t ones       = val / 100;
+        uint8_t tenths     = (val / 10) % 10;
+        uint8_t hundredths = val % 10;
+        _showDigits(_seg(ones) | SEG_DP, _seg(tenths), _seg(hundredths), SEG_A);
+    } else {
+        if (a > 99.9f) a = 99.9f;
+        uint16_t val = (uint16_t)(a * 10 + 0.5f);
+        uint8_t tens = val / 100;
+        uint8_t ones = (val / 10) % 10;
+        uint8_t dec  = val % 10;
+        uint8_t d0 = (tens > 0) ? _seg(tens) : SEG_OFF;
+        _showDigits(d0, _seg(ones) | SEG_DP, _seg(dec), SEG_A);
+    }
 }
 
 void LedDisplay::update(float voltage_V, float current_mA) {
