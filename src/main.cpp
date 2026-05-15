@@ -179,6 +179,44 @@ void checkButton() {
     lastButtonState = currentState;
 }
 
+void updateRGBLed(float current_mA) {
+    if (!outputEnabled) {
+        pixels.setPixelColor(0, 0);
+        pixels.show();
+        return;
+    }
+
+    const Config& config = wifi.getConfig();
+    if (!config.bConfigValid) {
+        pixels.setBrightness(80);
+        pixels.setPixelColor(0, pixels.Color(0, 0, 255));
+        pixels.show();
+        return;
+    }
+
+    float a = current_mA / 1000.0f;
+    if (a < 0) a = 0;
+    if (a > 10.0f) a = 10.0f;
+
+    float t = a / 10.0f;
+    uint8_t brightness = (uint8_t)(30 + t * 225);
+    uint8_t r, g;
+
+    if (t < 0.5f) {
+        float s = t * 2.0f;
+        r = (uint8_t)(s * 255);
+        g = 255;
+    } else {
+        float s = (t - 0.5f) * 2.0f;
+        r = 255;
+        g = (uint8_t)((1.0f - s) * 255);
+    }
+
+    pixels.setBrightness(brightness);
+    pixels.setPixelColor(0, pixels.Color(r, g, 0));
+    pixels.show();
+}
+
 // ---- Setup ---------------------------------------------------------------
 void setup() {
     Serial.begin(115200);
@@ -239,13 +277,7 @@ void loop() {
 
         ledDisplay.update(voltage, current);
 
-        if (voltage > 1.0f) {
-            pixels.setBrightness(50);
-            pixels.setPixelColor(0, pixels.Color(0, 200, 0));
-        } else {
-            pixels.setPixelColor(0, pixels.Color(0, 0, 0));
-        }
-        pixels.show();
+        updateRGBLed(current);
     }
 
     if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
