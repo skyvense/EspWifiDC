@@ -96,42 +96,20 @@ void LedDisplay::_showVoltage(float v) {
 
 void LedDisplay::_showCurrent(float mA) {
     if (mA < 0) mA = 0;
+    float a = mA / 1000.0f;
+    if (a > 9.99f) a = 9.99f;
 
-    if (mA < 1000.0f) {
-        uint16_t val = (uint16_t)(mA + 0.5f);
-        if (val > 999) val = 999;
-        uint8_t hundreds = val / 100;
-        uint8_t tens     = (val / 10) % 10;
-        uint8_t ones     = val % 10;
-        uint8_t d0 = (hundreds > 0) ? _seg(hundreds) : SEG_OFF;
-        uint8_t d1 = (val >= 10)    ? _seg(tens)     : SEG_OFF;
-        uint8_t d2 = _seg(ones);
-        uint8_t d3 = SEG_m;
-        _showDigits(d0, d1, d2, d3);
-    } else if (mA < 10000.0f) {
-        float a = mA / 1000.0f;
-        uint16_t val = (uint16_t)(a * 100 + 0.5f);
-        uint8_t ones = val / 100;
-        uint8_t tenths = (val / 10) % 10;
-        uint8_t hundredths = val % 10;
-        uint8_t d0 = _seg(ones) | SEG_DP;
-        uint8_t d1 = _seg(tenths);
-        uint8_t d2 = _seg(hundredths);
-        uint8_t d3 = SEG_A;
-        _showDigits(d0, d1, d2, d3);
-    } else {
-        float a = mA / 1000.0f;
-        if (a > 99.9f) a = 99.9f;
-        uint16_t val = (uint16_t)(a * 10 + 0.5f);
-        uint8_t tens = val / 100;
-        uint8_t ones = (val / 10) % 10;
-        uint8_t dec  = val % 10;
-        uint8_t d0 = (tens > 0) ? _seg(tens) : SEG_OFF;
-        uint8_t d1 = _seg(ones) | SEG_DP;
-        uint8_t d2 = _seg(dec);
-        uint8_t d3 = SEG_A;
-        _showDigits(d0, d1, d2, d3);
-    }
+    uint16_t val = (uint16_t)(a * 100 + 0.5f);
+    uint8_t ones       = val / 100;
+    uint8_t tenths     = (val / 10) % 10;
+    uint8_t hundredths = val % 10;
+
+    uint8_t d0 = _seg(ones) | SEG_DP;
+    uint8_t d1 = _seg(tenths);
+    uint8_t d2 = _seg(hundredths);
+    uint8_t d3 = SEG_A;
+
+    _showDigits(d0, d1, d2, d3);
 }
 
 void LedDisplay::update(float voltage_V, float current_mA) {
