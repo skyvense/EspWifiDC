@@ -7,7 +7,6 @@ WiFi-controlled DC power supply with real-time monitoring, based on ESP8266.
 - **Output Enable Control** — Remote on/off switch via web UI, with state persistence across reboots
 - **Power Monitoring** — INA219 measures voltage, current, and power in real time (0.01Ω shunt, 10x calibrated)
 - **7-Segment Display** — CH455G drives a 4-digit display showing voltage (XX.XV) and current (X.XXA / XX.XA), alternating every 2 seconds
-- **OLED Display** — SSD1306 shows WiFi status and power info in rotation
 - **Web Interface** — Responsive dashboard with live power data, output toggle, and power chart
 - **WiFi Management** — Auto-connect with AP fallback; configure credentials via captive portal
 - **MQTT** — Publish power data to an MQTT broker
@@ -22,7 +21,6 @@ WiFi-controlled DC power supply with real-time monitoring, based on ESP8266.
 | ESP8266 NodeMCU | Main controller |
 | INA219 | Voltage/current sensor (0.01Ω shunt) |
 | CH455G | I2C 7-segment LED driver (4 digits) |
-| SSD1306 | 128×32 I2C OLED |
 | NeoPixel | WS2812B RGB LED (×1) |
 
 ### Pin Mapping
@@ -43,7 +41,6 @@ WiFi-controlled DC power supply with real-time monitoring, based on ESP8266.
 - PlatformIO (espressif8266 platform)
 - ArduinoJson
 - Adafruit INA219
-- Adafruit SSD1306 + GFX
 - Adafruit NeoPixel
 - EasyLed
 - PubSubClient
@@ -90,7 +87,6 @@ src/
 ├── main.cpp           # Main loop, setup, button, MQTT
 ├── PowerMonitor.h     # INA219 wrapper with 10x shunt correction
 ├── LedDisplay.h/cpp   # CH455G 7-segment driver
-├── Display.h/cpp      # SSD1306 OLED display
 ├── WebServer.h/cpp    # HTTP server + embedded HTML
 └── EspSmartWifi.h/cpp # WiFi config, AP/STA management
 ```

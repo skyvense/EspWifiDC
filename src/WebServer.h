@@ -5,13 +5,12 @@
 #include <ESP8266httpUpdate.h>
 #include "EspSmartWifi.h"
 #include "PowerMonitor.h"
-#include "Display.h"
 
 #define BUTTON_PIN 0
 
 class WebServer {
 public:
-    WebServer(EspSmartWifi& wifi, EasyLed& led, Display& display);
+    WebServer(EspSmartWifi& wifi, EasyLed& led);
     void begin();
     void handleClient();
     void stop();
@@ -23,7 +22,6 @@ private:
     ESP8266WebServer server;
     EspSmartWifi&    wifi;
     EasyLed&         led;
-    Display&         display;
     PowerMonitor     powerMonitor;
 
     // 基本处理函数

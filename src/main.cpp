@@ -10,7 +10,6 @@
 #include "EspSmartWifi.h"
 #include "WebServer.h"
 #include "PowerMonitor.h"
-#include "Display.h"
 #include "LedDisplay.h"
 
 // ---- 引脚定义 ------------------------------------------------------------
@@ -25,9 +24,8 @@ Adafruit_NeoPixel pixels(NUM_LEDS, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
 
 EasyLed        led(STATUS_LED, EasyLed::ActiveLevel::Low, EasyLed::State::Off);
 EspSmartWifi   wifi(led);
-Display        display;
 LedDisplay     ledDisplay;
-WebServer      webServer(wifi, led, display);
+WebServer      webServer(wifi, led);
 PowerMonitor   powerMonitor;
 PubSubClient   mqtt(wifi.client);
 
@@ -200,11 +198,6 @@ void setup() {
         Serial.println("Failed to initialize power monitor!");
     }
 
-    // OLED 显示
-    if (!display.begin()) {
-        Serial.println("Failed to initialize OLED display!");
-    }
-
     // WiFi
     wifi.initFS();
     wifi.ConnectWifi();
@@ -239,8 +232,6 @@ void loop() {
     wifi.WiFiWatchDog();
     webServer.handleClient();
     yield();
-
-    display.update();
 
     if (loop_count % 200 == 0) {
         float current = powerMonitor.getCurrent_mA();

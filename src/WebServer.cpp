@@ -572,8 +572,8 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 extern bool outputEnabled;
 extern void setOutputEnable(bool en);
 
-WebServer::WebServer(EspSmartWifi& wifi, EasyLed& led, Display& display)
-    : server(80), wifi(wifi), led(led), display(display) {
+WebServer::WebServer(EspSmartWifi& wifi, EasyLed& led)
+    : server(80), wifi(wifi), led(led) {
     Serial.println("\n=== WebServer Initialization ===");
     
     // 初始化SPIFFS
