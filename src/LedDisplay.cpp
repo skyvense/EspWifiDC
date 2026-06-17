@@ -1,4 +1,5 @@
 #include "LedDisplay.h"
+#include "PinConfig.h"
 
 uint8_t LedDisplay::_seg(uint8_t n) {
     const uint8_t tbl[] = {
@@ -27,15 +28,17 @@ void LedDisplay::_showDigits(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3) {
 }
 
 void LedDisplay::_reinit() {
-    Wire.begin();
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
     uint8_t sysParam = CH455_BIT_KOFF
                      | ((_brightness & 0x07) << 4)
                      | CH455_BIT_ENA;
     Wire.beginTransmission(CH455_SYS_ADDR);
     Wire.write(sysParam);
-    Wire.endTransmission();
+    uint8_t err = Wire.endTransmission();
     _i2cErrCnt = 0;
-    Serial.println("CH455G re-initialized after I2C error");
+    if (err == 0) {
+        Serial.println("CH455G re-initialized");
+    }
 }
 
 void LedDisplay::begin(uint8_t brightness) {
@@ -53,6 +56,11 @@ void LedDisplay::begin(uint8_t brightness) {
 }
 
 void LedDisplay::setIP(IPAddress ip) {
+    // IP 变化时重新触发"显示 IP 10 秒"的窗口
+    if (!_ipSet || ip != _ip) {
+        _startMs  = millis();
+        _switchMs = millis();
+    }
     _ip    = ip;
     _ipSet = true;
 }
@@ -118,7 +126,8 @@ void LedDisplay::_showCurrent(float mA) {
 void LedDisplay::update(float voltage_V, float current_mA) {
     unsigned long now = millis();
 
-    if (_i2cErrCnt >= 3 || now - _lastReinit >= REINIT_INTERVAL_MS) {
+    bool needReinit = (_i2cErrCnt >= 3) || (now - _lastReinit >= REINIT_INTERVAL_MS);
+    if (needReinit && now - _lastReinit >= REINIT_BACKOFF_MS) {
         _reinit();
         _lastReinit = now;
     }

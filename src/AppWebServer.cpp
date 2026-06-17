@@ -1,16 +1,20 @@
-#include "WebServer.h"
+#include "AppWebServer.h"
+#include "PinConfig.h"
+#include "CH224K.h"
 #include <ArduinoJson.h>
-#include <FS.h>  // 添加SPIFFS支持
+#include <FS.h>
+#include <SPIFFS.h>
+#include <Update.h>
 
 #define BUILD_DATE_STR __DATE__ " " __TIME__
 
 // 定义静态成员变量
 
-const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
+const char AppWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP8266 Power Supply</title>
+    <title>ESP32-C3 Power Supply</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -306,13 +310,46 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             outline: none;
             border-color: var(--primary-color);
         }
+
+        .pd-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            padding: 10px 0;
+        }
+
+        .pd-btn {
+            padding: 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-color);
+            background: #fff;
+            border: 2px solid var(--primary-color);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .pd-btn:hover {
+            background: #e3f2fd;
+        }
+
+        .pd-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        @media (max-width: 480px) {
+            .pd-buttons { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+            .pd-btn { padding: 10px 0; font-size: 14px; }
+        }
     </style>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>ESP8266 Power Supply</h1>
+            <h1>ESP32-C3 Power Supply</h1>
             <div class="status">Status: Connected</div>
         </div>
 
@@ -348,6 +385,20 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
                     <span class="slider"></span>
                 </label>
                 <div class="power-label" style="margin-top:12px; font-size:16px;" id="outputStatus">Output: OFF</div>
+            </div>
+        </div>
+
+        <div class="power-info pd-control">
+            <h2>PD Voltage</h2>
+            <div class="pd-buttons">
+                <button class="pd-btn" data-v="5"  onclick="setPdVoltage(5)">5V</button>
+                <button class="pd-btn" data-v="9"  onclick="setPdVoltage(9)">9V</button>
+                <button class="pd-btn" data-v="12" onclick="setPdVoltage(12)">12V</button>
+                <button class="pd-btn" data-v="15" onclick="setPdVoltage(15)">15V</button>
+                <button class="pd-btn" data-v="20" onclick="setPdVoltage(20)">20V</button>
+            </div>
+            <div class="power-label" style="margin-top:12px; text-align:center; font-size:14px;">
+                Selected: <span id="pdVoltageLabel">--</span>
             </div>
         </div>
 
@@ -524,6 +575,7 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             updatePowerData();
             updateBuildDate();
             checkOutput();
+            checkPdVoltage();
         });
 
         // 定期更新数据
@@ -563,6 +615,33 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 
         // 每2秒同步一次输出状态
         setInterval(checkOutput, 2000);
+
+        // ---- PD 电压控制 ------------------------------------------------
+        function updatePdVoltageUI(v) {
+            document.getElementById('pdVoltageLabel').textContent = v + 'V';
+            document.querySelectorAll('.pd-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.v, 10) === v);
+            });
+        }
+
+        function checkPdVoltage() {
+            fetch('/voltage')
+                .then(r => r.json())
+                .then(d => updatePdVoltageUI(d.voltage))
+                .catch(e => console.error('Error reading PD voltage:', e));
+        }
+
+        function setPdVoltage(v) {
+            if (!confirm('Switch USB-PD voltage to ' + v + 'V?\nMake sure the load can handle it.')) {
+                return;
+            }
+            fetch('/voltage?v=' + v)
+                .then(r => r.json())
+                .then(d => updatePdVoltageUI(d.voltage))
+                .catch(e => console.error('Error setting PD voltage:', e));
+        }
+
+        setInterval(checkPdVoltage, 5000);
     </script>
 </body>
 </html>
@@ -571,52 +650,34 @@ const char WebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 // extern 访问 main.cpp 中的输出使能状态
 extern bool outputEnabled;
 extern void setOutputEnable(bool en);
+extern CH224K ch224k;
 
-WebServer::WebServer(EspSmartWifi& wifi, EasyLed& led)
-    : server(80), wifi(wifi), led(led) {
-    Serial.println("\n=== WebServer Initialization ===");
-    
-    // 初始化SPIFFS
-    Serial.println("Initializing SPIFFS...");
-    if (!SPIFFS.begin()) {
-        Serial.println("ERROR: SPIFFS initialization failed!");
-        return;
-    }
-    Serial.println("SUCCESS: SPIFFS initialized successfully");
-    
-    // 检查文件系统状态
-    FSInfo fs_info;
-    SPIFFS.info(fs_info);
-    Serial.print("Total bytes: ");
-    Serial.println(fs_info.totalBytes);
-    Serial.print("Used bytes: ");
-    Serial.println(fs_info.usedBytes);
-    
-
-    
-    // 初始化按钮引脚
-    Serial.println("\nInitializing button pin...");
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-    Serial.println("Button pin initialized with internal pull-up");
-    
-    // 初始化PowerMonitor
-    Serial.println("\nInitializing PowerMonitor...");
-    if (initPowerMonitor()) {
-        Serial.println("SUCCESS: PowerMonitor initialized successfully");
-    } else {
-        Serial.println("ERROR: PowerMonitor initialization failed!");
-    }
-    
-
-    
-    Serial.println("=== WebServer Initialization Complete ===\n");
+AppWebServer::AppWebServer(EspSmartWifi& wifi)
+    : server(80), wifi(wifi) {
+    // 构造函数只能做轻量初始化：本对象是全局变量，会在 FreeRTOS
+    // 调度器启动之前被构造，SPIFFS/Wire 等 ESP-IDF 子系统此时不可用。
+    // 真正的硬件/文件系统初始化放到 begin() 里。
 }
 
-bool WebServer::initPowerMonitor() {
+bool AppWebServer::initPowerMonitor() {
     return powerMonitor.begin();
 }
 
-void WebServer::begin() {
+void AppWebServer::begin() {
+    Serial.println("\n=== WebServer Initialization ===");
+    Serial.print("SPIFFS total bytes: ");
+    Serial.println(SPIFFS.totalBytes());
+    Serial.print("SPIFFS used bytes: ");
+    Serial.println(SPIFFS.usedBytes());
+
+    pinMode(PIN_BUTTON, INPUT_PULLUP);
+
+    if (initPowerMonitor()) {
+        Serial.println("PowerMonitor initialized");
+    } else {
+        Serial.println("PowerMonitor init failed");
+    }
+
     // 先停止服务器
     server.stop();
     
@@ -642,6 +703,7 @@ void WebServer::begin() {
     server.on("/status", HTTP_GET, [this]() { handleStatus(); });
     server.on("/power",   HTTP_GET,  [this]() { handlePower(); });
     server.on("/output",  HTTP_GET,  [this]() { handleOutput(); });  // 输出使能控制
+    server.on("/voltage", HTTP_GET,  [this]() { handleVoltage(); }); // CH224K 电压选择
     server.on("/restart", HTTP_POST, [this]() { handleRestart(); });
     server.on("/upgrade", HTTP_GET, [this]() { handleUpgrade(); });
     server.on("/update", HTTP_POST, [this]() { handleUpdate(); }, [this]() { handleUpdateUpload(); });
@@ -658,18 +720,18 @@ void WebServer::begin() {
     initTime();
 }
 
-void WebServer::handleClient() {
+void AppWebServer::handleClient() {
     server.handleClient();
 
 }
 
-void WebServer::stop() {
+void AppWebServer::stop() {
     server.stop();
     Serial.println("HTTP server stopped");
 }
 
 
-void WebServer::handlePower() {
+void AppWebServer::handlePower() {
     StaticJsonDocument<256> doc;
     
     if (powerMonitor.isInitialized()) {
@@ -684,11 +746,11 @@ void WebServer::handlePower() {
     server.send(200, "application/json", response);
 }
 
-void WebServer::handleRoot() {
+void AppWebServer::handleRoot() {
     server.send_P(200, "text/html", INDEX_HTML);
 }
 
-void WebServer::handleStatus() {
+void AppWebServer::handleStatus() {
     StaticJsonDocument<512> doc;
     
     // WiFi status
@@ -707,20 +769,20 @@ void WebServer::handleStatus() {
 }
 
 
-void WebServer::handleRestart() {
+void AppWebServer::handleRestart() {
     server.send(200, "text/plain", "Restarting...");
     delay(1000);
     ESP.restart();
 }
 
 
-void WebServer::HandleConfigRoot()
+void AppWebServer::HandleConfigRoot()
 {
     String html = R"(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP8266 WiFi Configuration</title>
+    <title>ESP32-C3 WiFi Configuration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; }
@@ -782,7 +844,7 @@ void WebServer::HandleConfigRoot()
     server.send(200, "text/html", html);
 }
 
-void WebServer::HandleConfigSave()
+void AppWebServer::HandleConfigSave()
 {
     if (!server.hasArg("ssid") || !server.hasArg("passwd") || 
         !server.hasArg("server") || !server.hasArg("topic")) {
@@ -840,7 +902,7 @@ void WebServer::HandleConfigSave()
 }
 
 
-void WebServer::handleUpgrade() {
+void AppWebServer::handleUpgrade() {
     String html = R"(
         <!DOCTYPE html>
         <html>
@@ -941,19 +1003,18 @@ void WebServer::handleUpgrade() {
     server.send(200, "text/html", html);
 }
 
-void WebServer::handleUpdate() {
+void AppWebServer::handleUpdate() {
     server.send(200, "text/plain", "Update complete. Rebooting...");
     delay(1000);
     ESP.restart();
 }
 
-void WebServer::handleUpdateUpload() {
+void AppWebServer::handleUpdateUpload() {
     HTTPUpload& upload = server.upload();
     
     if (upload.status == UPLOAD_FILE_START) {
         Serial.println("Update: " + upload.filename);
-        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-        if (!Update.begin(maxSketchSpace)) {
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Serial.println("Update begin failed");
             server.send(500, "text/plain", "Update begin failed");
             return;
@@ -974,16 +1035,16 @@ void WebServer::handleUpdateUpload() {
     }
 }
 
-void WebServer::handleNotFound() {
+void AppWebServer::handleNotFound() {
     server.send(404, "text/plain", "Not found");
 }
 
-void WebServer::handleButtonPress() {
+void AppWebServer::handleButtonPress() {
   
 
 }
 
-void WebServer::initTime() {
+void AppWebServer::initTime() {
     configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
     Serial.println("Waiting for NTP time sync...");
     delay(1000);
@@ -994,7 +1055,7 @@ void WebServer::initTime() {
     Serial.println("\nTime synchronized");
 }
 
-void WebServer::handleGetConfigData() {
+void AppWebServer::handleGetConfigData() {
     StaticJsonDocument<512> doc;
     const Config& config = wifi.getConfig();
     
@@ -1008,7 +1069,31 @@ void WebServer::handleGetConfigData() {
     server.send(200, "application/json", response);
 }
 
-void WebServer::handleOutput() {
+void AppWebServer::handleVoltage() {
+    StaticJsonDocument<64> doc;
+
+    if (server.hasArg("v")) {
+        int v = server.arg("v").toInt();
+        switch (v) {
+            case 5:  ch224k.setVoltage(CH224K::V5);  break;
+            case 9:  ch224k.setVoltage(CH224K::V9);  break;
+            case 12: ch224k.setVoltage(CH224K::V12); break;
+            case 15: ch224k.setVoltage(CH224K::V15); break;
+            case 20: ch224k.setVoltage(CH224K::V20); break;
+            default:
+                server.send(400, "text/plain", "v must be one of 5/9/12/15/20");
+                return;
+        }
+        Serial.printf("WebServer: PD voltage -> %dV\n", v);
+    }
+
+    doc["voltage"] = (int)ch224k.getVoltage();
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+}
+
+void AppWebServer::handleOutput() {
     StaticJsonDocument<64> doc;
 
     if (server.hasArg("enable")) {

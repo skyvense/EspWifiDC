@@ -8,21 +8,19 @@
 ; Please visit documentation for the other options and examples
 ; https://docs.platformio.org/page/projectconf.html
 
-[env:esp32-c3-devkitm-1]
-platform = espressif32
-board = esp32-c3-devkitm-1
+[env:nodemcu]
+platform = espressif8266
+board = nodemcu
 framework = arduino
 monitor_speed = 115200
-monitor_filters = esp32_exception_decoder
-build_flags =
-	-fpermissive
-	-DARDUINO_USB_MODE=1
-	-DARDUINO_USB_CDC_ON_BOOT=1
+monitor_filters = esp8266_exception_decoder
+build_flags = -fpermissive
 lib_deps =
 	bblanchon/ArduinoJson@^6.21.3
+	lnlp/EasyLed@^1.1.0
 	knolleary/PubSubClient@^2.8
 	adafruit/Adafruit BusIO@^1.14.1
 	makuna/NeoPixelBus@^2.8.4
 	adafruit/Adafruit NeoPixel@^1.14.0
 board_build.filesystem = spiffs
-board_build.partitions = min_spiffs.csv
+board_build.filesystem_size = 1M

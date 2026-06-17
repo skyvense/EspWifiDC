@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <Wire.h>
-#include <ESP8266WiFi.h>
+#include <IPAddress.h>
 
 // ---------------------------------------------------------------------------
 // CH455G 2-wire 协议说明：
@@ -60,6 +60,7 @@
 #define IP_DISPLAY_MS   10000
 #define DATA_CYCLE_MS   2000
 #define REINIT_INTERVAL_MS 30000
+#define REINIT_BACKOFF_MS  5000   // 出错后两次 _reinit 之间最短间隔
 
 class LedDisplay {
 public:

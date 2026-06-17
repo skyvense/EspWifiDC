@@ -21,25 +21,37 @@ public:
     }
     
     bool begin() {
-        Wire.begin();
+        // Wire bus is initialized by main setup() with the correct pins
         if (!ina219.begin()) {
             Serial.println("Failed to find INA219 chip");
+            _initialized = false;
             return false;
         }
-        
+
         ina219.setCalibration_32V_2A();
-        
+
         Serial.printf("INA219 init, shunt=%.3f ohm, factor=%.1fx\n", SHUNT_OHM, SHUNT_FACTOR);
-        
+
         _initialized = true;
         return true;
     }
-    
+
+    // 在 loop 里周期调用：未初始化时每 5 秒重试一次
+    bool tryReinit() {
+        if (_initialized) return true;
+        unsigned long now = millis();
+        if (now - _lastInitAttempt < 5000) return false;
+        _lastInitAttempt = now;
+        return begin();
+    }
+
     float getBusVoltage_V() {
+        if (!_initialized) return 0;
         return ina219.getBusVoltage_V();
     }
-    
+
     float getCurrent_mA() {
+        if (!_initialized) return 0;
         float rawCurrent = ina219.getCurrent_mA() * SHUNT_FACTOR;
         if (rawCurrent < 0) {
             if (bufferCount == 0) return 0;
@@ -56,6 +68,7 @@ public:
     }
     
     float getPower_mW() {
+        if (!_initialized) return 0;
         float rawPower = ina219.getPower_mW() * SHUNT_FACTOR;
         if (rawPower < 0) {
             if (powerCount == 0) return 0;
@@ -78,6 +91,7 @@ public:
 private:
     Adafruit_INA219 ina219;
     bool _initialized;
+    unsigned long _lastInitAttempt = 0;
     float currentBuffer[10];
     int bufferIndex;
     int bufferCount;

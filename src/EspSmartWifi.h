@@ -1,9 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include <FS.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <ESP8266WebServer.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <ArduinoJson.h>
 
 struct Config {
@@ -28,11 +27,9 @@ struct EMPTY_SERIAL
 //#define Serial_debug  _EMPTY_SERIAL
 #define Serial_debug  Serial
 
-class EasyLed;
 class EspSmartWifi
 {
 private:
-    EasyLed &led_;
     fs::File root;
     Config _config;
     bool _isAPMode;
@@ -41,11 +38,11 @@ private:
 
     bool LoadConfig();
     bool SaveConfig();
-    
+
 
 public:
-    EspSmartWifi(EasyLed &led):
-    led_(led), _isAPMode(false)
+    EspSmartWifi():
+    _isAPMode(false)
     {
     }
     ~EspSmartWifi(){
@@ -56,7 +53,7 @@ public:
     bool WiFiWatchDog();
     void ConnectWifi();
     void DisplayIP();
-    
+
     // HTTP client methods
     String httpGet(const String& path);
     const Config& getConfig() const { return _config; }
@@ -71,7 +68,3 @@ public:
     void StopAPMode();
     void TryConnectWifi();
   };
-
-
-
-

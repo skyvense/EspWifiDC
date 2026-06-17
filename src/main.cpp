@@ -1,35 +1,33 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Wire.h>
-#include <EasyLed.h>
+#include <SPIFFS.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
 
+#include "PinConfig.h"
 #include "EspSmartWifi.h"
-#include "WebServer.h"
+#include "AppWebServer.h"
 #include "PowerMonitor.h"
 #include "LedDisplay.h"
+#include "CH224K.h"
 
-// ---- 引脚定义 ------------------------------------------------------------
-#define STATUS_LED      D4      // EasyLed 状态灯（低电平有效）
-#define OUTPUT_EN_PIN   16      // GPIO16, HIGH=output enabled, LOW=disabled
-#define RGB_LED_PIN     13      // GPIO13，NeoPixel
 #define NUM_LEDS        1
 #define BRIGHTNESS      50
 
 // ---- 全局对象 ------------------------------------------------------------
-Adafruit_NeoPixel pixels(NUM_LEDS, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels(NUM_LEDS, PIN_RGB_LED, NEO_GRB + NEO_KHZ800);
 
-EasyLed        led(STATUS_LED, EasyLed::ActiveLevel::Low, EasyLed::State::Off);
-EspSmartWifi   wifi(led);
+EspSmartWifi   wifi;
 LedDisplay     ledDisplay;
-WebServer      webServer(wifi, led);
+AppWebServer   webServer(wifi);
 PowerMonitor   powerMonitor;
 PubSubClient   mqtt(wifi.client);
+CH224K         ch224k;
 
-// ---- 输出使能状态（WebServer 通过 extern 访问） --------------------------
+// ---- 输出使能状态（AppWebServer 通过 extern 访问） ----------------------
 bool outputEnabled = false;
 
 void loadOutputState() {
@@ -41,7 +39,7 @@ void loadOutputState() {
         }
         f.close();
     }
-    digitalWrite(OUTPUT_EN_PIN, outputEnabled ? HIGH : LOW);
+    digitalWrite(PIN_OUTPUT_EN, outputEnabled ? HIGH : LOW);
     Serial.printf("Output state loaded: %s\n", outputEnabled ? "ON" : "OFF");
 }
 
@@ -57,7 +55,7 @@ void saveOutputState() {
 
 void setOutputEnable(bool en) {
     outputEnabled = en;
-    digitalWrite(OUTPUT_EN_PIN, en ? HIGH : LOW);
+    digitalWrite(PIN_OUTPUT_EN, en ? HIGH : LOW);
     saveOutputState();
     Serial.printf("Output %s\n", en ? "ENABLED" : "DISABLED");
 }
@@ -110,7 +108,8 @@ bool connectMQTT() {
         }
     });
 
-    String clientId = "EspRouterPower" + String(ESP.getChipId(), HEX);
+    uint32_t chipId = (uint32_t)(ESP.getEfuseMac() & 0xFFFFFFFF);
+    String clientId = "EspRouterPower" + String(chipId, HEX);
     if (username.length() > 0)
         return mqtt.connect(clientId.c_str(), username.c_str(), password.c_str());
     return mqtt.connect(clientId.c_str());
@@ -140,6 +139,7 @@ void publishPowerData() {
     channel["voltage"] = voltage;
     channel["power"]   = power;
     channel["output_en"] = outputEnabled;
+    channel["pd_voltage"] = (int)ch224k.getVoltage();
 
     Serial.println("==============================\n");
     char buffer[512];
@@ -150,7 +150,7 @@ void publishPowerData() {
 
 // ---- 按钮处理 ------------------------------------------------------------
 void checkButton() {
-    bool currentState = digitalRead(BUTTON_PIN);
+    bool currentState = digitalRead(PIN_BUTTON);
     if (currentState == lastButtonState) { lastButtonState = currentState; return; }
     if (millis() - lastButtonPress <= DEBOUNCE_DELAY) { lastButtonState = currentState; return; }
 
@@ -158,13 +158,12 @@ void checkButton() {
 
     if (currentState == LOW) {  // 按下
         unsigned long pressStart = millis();
-        while (digitalRead(BUTTON_PIN) == LOW) {
+        while (digitalRead(PIN_BUTTON) == LOW) {
             delay(50);
             if (millis() - pressStart > 3000) {
                 // 长按 3 秒：清除配置重启
                 if (SPIFFS.remove("/config.json")) {
                     Serial.println("Config cleared, restarting...");
-                    led.flash(5, 100, 100, 0, 0);
                     delay(1000);
                     ESP.restart();
                 }
@@ -174,7 +173,6 @@ void checkButton() {
         }
         // 短按：切换输出使能
         setOutputEnable(!outputEnabled);
-        led.flash(1, 100, 100, 0, 0);
     }
     lastButtonState = currentState;
 }
@@ -222,9 +220,15 @@ void setup() {
     Serial.begin(115200);
     Serial.setRxBufferSize(2048);
 
+    // I2C 总线（INA219 + CH455G 共用）
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+
     // 输出使能引脚（默认禁用）
-    pinMode(OUTPUT_EN_PIN, OUTPUT);
-    digitalWrite(OUTPUT_EN_PIN, LOW);
+    pinMode(PIN_OUTPUT_EN, OUTPUT);
+    digitalWrite(PIN_OUTPUT_EN, LOW);
+
+    // CH224K USB-PD 协商，默认 9V
+    ch224k.begin(PIN_CH224_CFG1, PIN_CH224_CFG2, PIN_CH224_CFG3, CH224K::V9);
 
     // NeoPixel 初始化
     pixels.begin();
@@ -245,9 +249,7 @@ void setup() {
 
     // CH455G 数码管
     ledDisplay.begin(6);
-    if (WiFi.status() == WL_CONNECTED) {
-        ledDisplay.setIP(WiFi.localIP());
-    }
+    ledDisplay.setIP(wifi.isAPMode() ? WiFi.softAPIP() : WiFi.localIP());
 
     // WebServer
     webServer.begin();
@@ -259,7 +261,7 @@ void setup() {
     delay(500);
 
     // 按钮引脚
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(PIN_BUTTON, INPUT_PULLUP);
 }
 
 // ---- Loop ----------------------------------------------------------------
@@ -271,7 +273,13 @@ void loop() {
     webServer.handleClient();
     yield();
 
+    // 跟踪 WiFi 模式/IP 变化，及时刷新数码管
+    IPAddress nowIP = wifi.isAPMode() ? WiFi.softAPIP() : WiFi.localIP();
+    ledDisplay.setIP(nowIP);  // setIP 自带"变化才重置"逻辑
+
     if (loop_count % 200 == 0) {
+        powerMonitor.tryReinit();
+
         float current = powerMonitor.getCurrent_mA();
         float voltage = powerMonitor.getBusVoltage_V();
 
@@ -285,14 +293,10 @@ void loop() {
         loop_count++;
         if (loop_count % 10000 == 0) {
             publishPowerData();
-            led.flash(1, 25, 25, 0, 0);
         }
     } else {
         if (wifi.isAPMode()) {
             loop_count++;
-            if (loop_count % 2000 == 0) {
-                led.flash(1, 10, 50, 0, 0);
-            }
         } else {
             if (!mqtt.connected()) {
                 loop_count++;
@@ -300,7 +304,6 @@ void loop() {
                     if (!connectMQTT()) {
                         Serial.println("Failed to reconnect to MQTT server");
                     }
-                    led.flash(2, 50, 50, 0, 0);
                 }
             }
         }
