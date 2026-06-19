@@ -3,7 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
-#define SHUNT_OHM 0.01f
+#define SHUNT_OHM 0.005f
 #define SHUNT_CALIBRATION_OHM 0.1f
 #define SHUNT_FACTOR (SHUNT_CALIBRATION_OHM / SHUNT_OHM)
 
